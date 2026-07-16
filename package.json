@@ -1,0 +1,13 @@
+{
+  "name": "coa-agent",
+  "version": "1.0.0",
+  "description": "Change-of-Occupancy agent — Just Move In take-home (Part A)",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node run.js"
+  },
+  "dependencies": {
+    "playwright": "^1.47.0",
+    "pdf-parse": "^1.1.1"
+  }
+}

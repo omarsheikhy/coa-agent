@@ -1,0 +1,29 @@
+{
+  "mover": {
+    "fullName": "Priya Sharma",
+    "email": "priya.sharma@gmail.com",
+    "phone": null,
+    "previousAddress": "27 Hartley Road, Levenshulme, Manchester, M19 3PL",
+    "newAddress": "Flat 4, 14 Elm Court, Northgate, NG2 4BD",
+    "moveDate": "2026-06-01",
+    "occupierType": "Tenant",
+    "numberOfOccupants": 2,
+    "additionalOccupants": [
+      "Thomas Bennett"
+    ],
+    "isMainResidence": true,
+    "council": "Northgate Borough Council",
+    "tenancyType": "Assured Shorthold Tenancy",
+    "landlordOrAgent": "Elm & Court Lettings (managing agent); Daniel Okafor (landlord)"
+  },
+  "chosenDocument": {
+    "label": "tenancy-agreement.pdf",
+    "path": "/Users/omarsheikh/Downloads/coa-agent 2/tmp/tenancy-agreement.pdf"
+  },
+  "rejectedDocuments": [
+    {
+      "label": "energy-bill.pdf",
+      "reason": "relates to previous address, not current occupancy"
+    }
+  ]
+}
