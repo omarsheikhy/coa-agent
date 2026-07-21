@@ -1,167 +1,115 @@
 # AI Prompt Log
 
 Candidate: Omar Sheikh (CAND-2026-292A)
-Tools used: Claude Code (CLI), Playwright, GitHub
+Tool: Claude Code (Anthropic's CLI — runs Claude directly in the terminal)
 
 ---
 
-## Overview
+## How I worked
 
-I used Claude Code throughout — Anthropic's CLI that runs Claude directly in the terminal with full access to read, write, and run files. My contribution was directing the build, running everything, catching mistakes, and making judgment calls about what to build and why. I didn't write code by hand.
-
-The build happened in two phases. Phase 1 was a working deterministic agent built to deadline. Phase 2 was a more agentic pipeline built in response to feedback that the original was too deterministic to scale.
+I directed Claude Code throughout. I didn't write code by hand — my contribution was the thinking: what to build, how to structure it, when to push back, when something wasn't good enough, and catching mistakes when I ran things. The prompts below are real, taken directly from the session.
 
 ---
 
-## Phase 1 — Deterministic agent
+## Phase 1 — Original deterministic agent
 
-### Step 1 — Read the brief and plan before building
+Built to deadline. Three scripts: extract.js picks the right document, fill-form.js replays a Playwright recording, run.js wires them together. Worked, but brittle — any change to the form would break it.
 
-Shared the full take-home brief with Claude Code and asked for a plan before touching any code. Agreed a sequence: build the working agent first (the only part with a hard pass/fail check), then the written sections reusing what the build surfaced.
+Key decisions I made:
+- Told the AI to build as separate scripts rather than one big file so each piece was inspectable on its own
+- Ran Playwright codegen myself against the live form rather than let the AI guess selectors
+- Caught two errors in my own recording (wrong move date, incomplete candidate token) and corrected them
+- Told the AI to leave the optional phone field blank rather than fabricate a number
+- Caught that the source PDFs had been committed to GitHub publicly and fixed it
 
-**Example prompt:**
-> "Here's the take-home brief. Before we build anything, give me a plan for how to approach this. What should we build first and why?"
-
----
-
-### Step 2 — Read the actual form and mover pack
-
-Had Claude Code fetch the live form and mover pack directly rather than work from the brief's summary. This surfaced the real mover data and — critically — the document trap: the energy bill states in its own text that it relates to the previous address. Asked for that to be checked explicitly.
-
-**Example prompt:**
-> "Fetch the mover pack from the URL and read both PDFs. Don't assume which document is correct — check what each one actually says and decide which one satisfies the form's requirement."
+I was explicit with the AI about what was actually agentic versus hardcoded, and pushed back when early write-ups made it sound more impressive than it was.
 
 ---
 
-### Step 3 — Build as separate scripts, not one big file
+## Phase 2 — Agentic pipeline
 
-Asked for a two-stage build: an extraction script that reads documents and decides which to attach, and a separate form-filling script. This kept the decision logic inspectable on its own.
-
-**Example prompt:**
-> "Build this as two separate scripts — one that handles the input and document decision, and one that drives the form. I want each piece to do one clear job."
+Built after feedback from Just Move In that the original was too deterministic to scale. This is where the real prompting work happened.
 
 ---
 
-### Step 4 — First attempt failed — selectors were guessed
+**Starting point — what I asked for:**
 
-The first form-filling script was written without visibility into the live form's actual HTML. Running it produced field-not-found errors — all the selectors were guesses.
-
----
-
-### Step 5 — Fixed it by running Playwright codegen myself
-
-Rather than keep guessing, ran `npx playwright codegen` against the live form, walked through the real 7-step flow manually, and pasted the recorded output back. This gave exact verified selectors and surfaced fields the brief hadn't mentioned — occupier type, number of occupants, main residence confirmation.
-
-**Example prompt:**
-> "Here's the Playwright codegen output from me manually filling the real form. Rewrite fill-form.js around this recording — use the exact selectors it captured, don't guess."
+> "I have a working deterministic agent here (extract.js, fill-form.js, run.js) that fills a council form using a fixed Playwright recording. I want to build a genuinely agentic version alongside it — new files, don't overwrite the originals — where instead of replaying fixed steps, an AI reads the current page's accessible structure and decides the next action itself, in a loop, until the form is submitted or it flags something it doesn't recognise. Keep extract.js's document-picking logic as-is. Use Playwright for browser control, and call the Claude API for the decision-making step. Start by scaffolding the loop structure and ask me before installing anything or making live submissions."
 
 ---
 
-### Step 6 — Caught my own mistakes
+**Deciding not to use the API:**
 
-My manual recording had two errors I caught on review: the move-in date was mistyped, and the candidate token was incomplete. Flagged both and had the correct values hardcoded.
+Claude Code scaffolded the loop and asked about installing the Anthropic SDK. I said yes to the install, then thought about it:
 
-**Example prompt:**
-> "The move date in the recording is wrong — it should be 2026-06-01 per the tenancy agreement, not what I typed. Fix it. Also the candidate token is incomplete — it should be CAND-2026-292A in full."
+> "i dont want to use api as i will be charged yeah"
 
----
+Claude Code suggested stubbing the AI call so the loop runs without API cost. I asked:
 
-### Step 7 — Phone number gap
+> "can i just prove the concept with claude code using the tokens i have and not api and explain i could switch out to api later"
 
-The form has an optional phone number field with no source in any document. Asked Claude Code to check all three source documents explicitly.
-
-**Example prompt:**
-> "Check all three source documents — the note, the tenancy agreement, and the energy bill — for a phone number. If it's not in any of them, leave the field blank rather than fabricate one. The form marks it optional."
+This led to the stub pattern — the AI decision step returns pre-scripted actions in the same JSON shape a real API call would return. Swap one line to go live.
 
 ---
 
-### Step 8 — Privacy issue on GitHub
+**Rethinking the architecture — one call not forty:**
 
-Pushed the repo and noticed the source PDFs and screenshots had been committed publicly. Added a .gitignore and removed the folder from tracking.
+After running the per-step loop, I questioned whether calling the AI once per action was the right approach:
 
-**Example prompt:**
-> "The tmp/ folder with the PDFs and screenshots got committed to GitHub and is now public. Add a .gitignore, remove the folder from tracking, and make sure it doesn't get committed again."
+> "i like the dummy data approach so get ai to keep an updated version of this page using ai to read and populate and do a dummy submission so the playwright rules are always up to date yeah"
 
----
-
-### Step 9 — Being honest about what's actually agentic
-
-Asked Claude Code to help articulate clearly which parts involve real decision-making versus fixed rules. Pushed back when early drafts sounded more impressive than accurate.
-
-**Example prompt:**
-> "Write up what this agent actually does — but be completely honest. Which parts involve real logic and which parts are just hardcoded or replaying a recording? Don't make it sound more agentic than it is."
+This shifted the architecture entirely — instead of the AI making decisions at runtime for each tenant, it learns the form once and saves a ruleset. Submissions just execute the saved plan.
 
 ---
 
-## Phase 2 — Agentic pipeline (built in response to feedback)
+**Handling a multi-page form:**
 
-Feedback from Just Move In: the original solution was too deterministic and hard to scale. Built a second version alongside the original — new files, nothing overwritten.
+I spotted a gap in the single-snapshot approach:
 
----
+> "the form is multiple pages you click thru tho"
 
-### Step 10 — Scaffolded the agentic loop
-
-Asked Claude Code to build a new entry point and loop structure where instead of replaying fixed steps, the system reads the live page at each step and decides the next action.
-
-**Example prompt:**
-> "Build a genuinely agentic version alongside the existing files — don't overwrite anything. New files only. Instead of replaying fixed steps, I want a loop that reads the current page's accessible structure and decides the next action itself. Use Playwright for browser control. Start by scaffolding the loop structure. Ask me before installing anything or making live submissions."
+Claude Code acknowledged the issue and offered options. I chose the discovery pass approach — navigate through every page with dummy data to see the full form before generating the plan.
 
 ---
 
-### Step 11 — Designed the discover/plan/execute split
+**Separating tenant data from the discovery pass:**
 
-Realised a per-step AI loop was expensive (one API call per action). Redesigned around a smarter architecture: one AI call to learn the form upfront, save the ruleset, execute it for any number of tenants.
+> "but i want to handle multiple tenants yeah"
 
-**Example prompt:**
-> "Instead of calling the AI once per action, I want one AI call that reads the whole form structure upfront and returns a complete action plan. The plan gets saved as a file. Submissions just load and execute the plan. Build that."
-
----
-
-### Step 12 — Built discover.js
-
-Asked Claude Code to build the discovery pass — navigates the form with dummy data and a throwaway PDF, snapshots every page, AI writes the Playwright ruleset.
-
-**Example prompt:**
-> "Build discover.js. It should open a real browser, navigate the form page by page using dummy data and a blank throwaway PDF (nothing from any real tenant), snapshot every page as ARIA text, and send all snapshots to an AI that writes the complete Playwright ruleset to form-plan.json. The dummy PDF is just to unlock each page — it's never submitted for real."
+This led to the throwaway PDF — the discovery pass should use a blank dummy document completely separate from any real tenant's files, so it's genuinely council-agnostic and tenant-agnostic.
 
 ---
 
-### Step 13 — Built compare.js
+**Removing the manual confirmation gate:**
 
-Asked Claude Code to build the AI cross-reference step — reads tenant data and form requirements together and flags any mismatches before the browser opens.
+The first version of agent-v2-run.js asked for a human "yes" before each submission. I pushed back:
 
-**Example prompt:**
-> "Build compare.js. Before any submission, an AI should read two things together: the tenant's full dataset and the form-plan.json that discover.js generated. It should check whether the tenant's data satisfies what the form is going to ask for — not just format checks, but logical mismatches like wrong document type or address inconsistencies. Stop the submission immediately if anything doesn't line up."
+> "i dont wana confirm manually think through this..."
 
----
-
-### Step 14 — Built validate.js
-
-Asked for a separate fast format-check layer — cheap deterministic checks that don't need AI.
-
-**Example prompt:**
-> "Build validate.js for the fast mechanical checks — required fields present, email format valid, move date correctly formatted, document file exists. This doesn't need AI. It runs after compare.js and before the browser opens."
+This led to validate.js — automated checks that replace the human gate. Humans only get involved when something fails.
 
 ---
 
-### Step 15 — Wired it all together
+**Adding the AI cross-reference step:**
 
-Asked Claude Code to orchestrate the full pipeline in agent-v2-run.js and remove the manual confirmation gate.
+> "is there needed for an api call to review all the tenant data and make sure its all there too yeah"
 
-**Example prompt:**
-> "Wire it all together in agent-v2-run.js: extract → compare → validate → submit. Remove the manual confirmation step — I don't want a human reviewing every submission. If the data passes all checks, proceed automatically. If anything fails, halt with a clear error."
+Then I pushed further:
+
+> "we compare the tenant data with what the form needs no??"
+
+This became compare.js — an AI call that reads the tenant's dataset and form-plan.json together and checks they match before the browser opens. More useful than generic validation because it's form-aware.
 
 ---
 
-### Step 16 — Ran it end to end and pushed to GitHub
+**On discovery frequency:**
 
-Ran the full pipeline, confirmed it worked, cleaned up old files, and pushed.
+> "i can choose to update the playwright script with ai more regularly if i need to, will be less deterministic then but only if the form changes regularly"
 
-**Example prompt:**
-> "Remove fill-form.js, run.js, and the intermediate versions from the repo. The new pipeline is the only version. Update the README to reflect what's actually been built. Then push."
+This framing — discovery frequency as a dial you control, not a code change — is what makes the architecture genuinely less deterministic. The same pipeline becomes more or less adaptive depending on how often you run discover.js.
 
 ---
 
 ## What's stubbed and why
 
-The AI calls inside discover.js and compare.js are stubbed — the stubs return the identical output shape a real call would return. I built and tested this using Claude Code on my existing subscription rather than wiring up direct Anthropic API calls for a take-home exercise. Swapping each stub for a live claude-sonnet-4-6 call is one line per file.
+The AI calls in discover.js and compare.js are stubbed. I built and tested this using Claude Code on my existing subscription rather than paying separately for Anthropic API calls on a take-home exercise. The stubs return the identical output a real call would return. One line to swap per file.
